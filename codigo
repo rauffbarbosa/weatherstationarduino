@@ -1,0 +1,196 @@
+#include <SD.h>
+#include <DS3231.h>
+#include <dht.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <Streaming.h>
+#include <LiquidCrystal_I2C.h>
+#include <Time.h>
+
+
+// Define o endereço utilizado pelo Adaptador I2C
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+DS3231 rtc;              //Criação do objeto do tipo DS3231
+RTCDateTime dataehora;   //Criação do objeto do tipo RTCDateTime
+
+// Define pino dht
+
+#define dataPin 7
+
+dht DHT;
+
+// Constantes:
+const int REED = 6;
+const int chipSelect = 4;
+File dataFile;
+ 
+// Variáveis:
+int val = 0;
+int old_val = 0;
+int REEDCOUNT = 0;
+int readData = DHT.read22(dataPin);
+float t = DHT.temperature;
+float h = DHT.humidity;
+
+
+void setup() {
+  
+  // Initializa o pino do switch como entrada
+  
+  pinMode (REED, INPUT_PULLUP); //This activates the internal pull up resistor
+ // pinMode(chipSelect, OUTPUT);
+ 
+  // Initializa a comunicaçao serial:
+  Serial.begin(9600);
+  rtc.begin();
+  SD.begin(chipSelect);
+  if (!SD.begin(chipSelect)){
+    Serial.print("Falha no SD");
+    delay(2000);
+  }
+  Serial.print("Iniciando SD");
+ // rtc.setDateTime(__DATE__, __TIME__);   //Configurando valores iniciais do RTC DS3231
+                                         
+  //Inicializa o LCD e o backlight (TELA 01)
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);      // Posiciona o cursor
+  lcd.print("Sitio do");    // Escreve no LCD "Pulsos: "
+  lcd.setCursor(0, 1);      // Posiciona o cursor
+  lcd.print("Bandera ");     // Escreve no LCD "Chuva: "
+  delay (2000);
+  lcd.clear();
+
+
+}
+ 
+void loop() {
+ int readData = DHT.read22(dataPin);
+ float t = DHT.temperature;
+ float h = DHT.humidity;
+ lcd.backlight(); 
+ lcd.setCursor(0,1);
+ lcd.print("C:");
+ lcd.setCursor(3,1);
+ lcd.print(t);
+ lcd.setCursor(8,1);
+ lcd.print(" U: ");
+ lcd.setCursor(12,1);
+ lcd.print(h);
+ lcd.setCursor(8,1);
+ lcd.print(" ");
+ dataehora = rtc.getDateTime(); 
+ Serial.print(" Temperatura = ");
+ Serial.print(t);
+ Serial.print(" °C ");
+ Serial.print("  Umidade = ");
+ Serial.print(h);
+ Serial.print(" %  ");
+ Serial.print(dataehora.year);     //Imprimindo o Ano   
+ Serial.print("-");
+ Serial.print(dataehora.month);    //Imprimindo o Mês
+ Serial.print("-");
+ Serial.print(dataehora.day);      //Imprimindo o Dia
+ Serial.print(" ");
+ Serial.print(dataehora.hour);     //Imprimindo a Hora
+ Serial.print(":");
+ Serial.print(dataehora.minute);   //Imprimindo o Minuto
+ Serial.print(":");
+ Serial.print(dataehora.second);   //Imprimindo o Segundo
+ Serial.println(" ");
+ //lcd.setCursor(0, 0);         //Posiciona o cursor
+ //lcd.print("Chuva:0 mm ");        //Escreve o número de Pulsos
+ long int i;
+  val = digitalRead(REED);      // Lê o Status do Reed Switch
+ 
+  if ((val == HIGH) && (old_val == LOW)) {   // Verefica se o Status mudou
+    delay(1500);                   // Atraso colocado para lidar com qualquer "salto" no switch.
+    REEDCOUNT = REEDCOUNT + 1;   // Adiciona 1 à cntagem de pulsos
+    old_val = val;              //Iguala o valor antigo com o atual
+ 
+    // Imprime no Monitor Serial
+    
+  //Atribuindo valores instantâneos de data e hora à instância dataehora
+    dataehora = rtc.getDateTime(); 
+    
+    //Serial.print("Medida de chuva (contagem): ");
+    //Serial.print(REEDCOUNT);
+   // Serial.println(" pulso");
+    Serial.print("Medida de chuva (calculado): ");
+    Serial.print(REEDCOUNT * 0.50);
+    Serial.print(" mm");
+    Serial.print(" Temperatura = ");
+    Serial.print(t);
+    Serial.print(" °C ");
+    Serial.print("  Umidade = ");
+    Serial.print(h);
+    Serial.print(" %  ");
+    Serial.print(dataehora.year);     //Imprimindo o Ano   
+    Serial.print("-");
+    Serial.print(dataehora.month);    //Imprimindo o Mês
+    Serial.print("-");
+    Serial.print(dataehora.day);      //Imprimindo o Dia
+    Serial.print(" ");
+    Serial.print(dataehora.hour);     //Imprimindo a Hora
+    Serial.print(":");
+    Serial.print(dataehora.minute);   //Imprimindo o Minuto
+    Serial.print(":");
+    Serial.print(dataehora.second);   //Imprimindo o Segundo
+    Serial.println(" ");
+ 
+    // Imprime as informações do Display (TELA 01)
+    lcd.backlight();
+    lcd.setCursor(0,1);
+    lcd.print("C:");
+    lcd.setCursor(3,1);
+    lcd.print(t);
+    lcd.setCursor(8,1);
+    lcd.print(" U: ");
+    lcd.setCursor(12,1);
+    lcd.print(h);
+    lcd.setCursor(8,1);
+    lcd.print(" ");
+    lcd.setCursor(0, 0);         //Posiciona o cursor
+    lcd.print("Chuva:0 mm ");        //Escreve o número de Pulsos
+   
+    lcd.setCursor(0, 0);         //Posiciona o cursor
+    lcd.print("Chuva: ");        //Escreve o número de Pulsos
+    lcd.setCursor(7, 0);   
+    lcd.print(REEDCOUNT * 0.50); //Escreve o valor em milímetros
+    lcd.setCursor(14, 0);        //Posiciona o cursor
+    lcd.print("mm");             //Escreve no LCD "mm"
+      
+ 
+    dataFile = SD.open("datalog.txt", FILE_WRITE);// Abre o SD para gravacao 
+    Serial.println("Gravando no SD");
+    dataFile.print("Medida de chuva (calculado): ");
+    dataFile.print(REEDCOUNT * 0.50);
+    dataFile.print(" mm");
+    dataFile.print(" Temperatura = ");
+    dataFile.print(t);
+    dataFile.print(" °C ");
+    dataFile.print("  Umidade = ");
+    dataFile.print(h);
+    dataFile.print(" %  ");
+    dataFile.print(dataehora.year);     //Imprimindo o Ano   
+    dataFile.print("-");
+    dataFile.print(dataehora.month);    //Imprimindo o Mês
+    dataFile.print("-");
+    dataFile.print(dataehora.day);      //Imprimindo o Dia
+    dataFile.print(" ");
+    dataFile.print(dataehora.hour);     //Imprimindo a Hora
+    dataFile.print(":");
+    dataFile.print(dataehora.minute);   //Imprimindo o Minuto
+    dataFile.print(":");
+    dataFile.print(dataehora.second);   //Imprimindo o Segundo
+    dataFile.println(" ");
+    dataFile.close();
+    for(i=0;i<1;i++){ // Executar loop a cada 10 segundos
+    delay(1000); }
+  }
+    else {
+      old_val=val;
+    }
+ 
+  delay(1000);  
+  }
